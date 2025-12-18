@@ -4,6 +4,7 @@
 *.out
 *.toc
 *.pdf
+!double_descent_tutorial.pdf
 *.synctex.gz
 *.fdb_latexmk
 *.fls
