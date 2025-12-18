@@ -1,0 +1,630 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{tikz}
+\geometry{margin=1in}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+
+\newtcolorbox{funbox}{colback=yellow!10!white,colframe=orange!75!black,title=Funny Example}
+\newtcolorbox{mathbox}{colback=blue!5!white,colframe=blue!75!black,title=Mathematical Insight}
+\newtcolorbox{keybox}{colback=red!5!white,colframe=red!75!black,title=Key Equation}
+
+\title{\textbf{Double Descent Demystified} \\
+\large A Comprehensive Tutorial with Mathematical Derivations and Absurd Examples}
+\author{Tutorial based on ICLR 2024 Blog Post}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This tutorial provides a comprehensive mathematical treatment of the double descent phenomenon in machine learning. We focus on ordinary linear regression and use singular value decomposition (SVD) to reveal three interpretable factors that cause test loss to spike at the interpolation threshold. The exposition includes detailed derivations, geometric intuition, and intentionally absurd examples to make the mathematics memorable and fun.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introduction: The Mystery of Double Descent}
+
+Imagine you're training a model. Classical wisdom says: too simple $\rightarrow$ underfit, too complex $\rightarrow$ overfit. The sweet spot is somewhere in the middle. This is the famous bias-variance tradeoff, giving us a U-shaped test error curve.
+
+But wait! Modern deep learning throws a wrench in this story. Make your model even MORE complex (more parameters than data points), and suddenly... the test error drops again! This creates a "double descent" curve:
+
+\begin{equation}
+\text{Test Error} = \underbrace{\text{U-shaped}}_{\text{Classical}} + \underbrace{\text{Another descent}}_{\text{Modern ML}}
+\end{equation}
+
+\begin{funbox}
+\textbf{The Pizza Analogy:}
+
+You're trying to predict pizza delivery times based on distance and traffic.
+
+\begin{itemize}
+\item \textbf{Underparameterized (2 data points, 1 parameter):} You can only capture ``more distance = more time''. Your model is too simple. It's like trying to explain pizza delivery with just ``distance matters'' -- you miss traffic, weather, if the delivery guy stopped to pet a dog, etc.
+
+\item \textbf{At interpolation threshold (2 data points, 2 parameters):} NOW you have exactly as many knobs as data points. Your model memorizes: ``123 Main St took 15 min, 456 Elm took 25 min.'' But what about 789 Oak St? Your model freaks out because it's trying to extrapolate from a knife's edge of information. \textbf{This is where things explode!}
+
+\item \textbf{Overparameterized (2 data points, 100 parameters):} Wait, more parameters should be worse, right? WRONG! With many parameters, your model can't just memorize specific addresses. It's forced to find patterns like ``oh, eastern addresses tend to take longer.'' It learns useful features!
+\end{itemize}
+\end{funbox}
+
+\section{Mathematical Setup}
+
+\subsection{Notation and Problem Definition}
+
+We have $N$ training samples with features $\vec{x}_n \in \mathbb{R}^D$ and targets $y_n \in \mathbb{R}$.
+
+\textbf{Matrix notation:}
+\begin{align}
+X &= \begin{bmatrix} \vec{x}_1^T \\ \vdots \\ \vec{x}_N^T \end{bmatrix} \in \mathbb{R}^{N \times D} \\
+Y &= \begin{bmatrix} y_1 \\ \vdots \\ y_N \end{bmatrix} \in \mathbb{R}^{N \times 1}
+\end{align}
+
+\textbf{Goal:} Learn $\hat{\vec{\beta}} \in \mathbb{R}^D$ such that:
+\begin{equation}
+y_n \approx \vec{x}_n \cdot \hat{\vec{\beta}}
+\end{equation}
+
+\textbf{Key parameters:}
+\begin{itemize}
+\item $P = D$: Number of parameters (in linear regression, $P = D$)
+\item $N$: Number of training samples
+\item Interpolation threshold: $N = P = D$
+\item Underparameterized: $N > P$
+\item Overparameterized: $N < P$
+\end{itemize}
+
+\begin{funbox}
+\textbf{The Dating Profile Example:}
+
+You're trying to predict compatibility scores based on profile features.
+
+\begin{itemize}
+\item $D = 3$ features: [loves\_dogs, reads\_books, likes\_hiking]
+\item $N = 5$ past dates with scores
+\item $P = 3$ parameters to learn (one weight per feature)
+\end{itemize}
+
+Since $N=5 > P=3$, you're \textbf{underparameterized}. You have more data than parameters -- life is good!
+
+But if you only went on $N=2$ dates and try to learn $P=3$ weights... that's \textbf{overparameterized}. You're trying to learn 3 things from 2 examples. At $N=3$, you're exactly at the interpolation threshold -- the danger zone!
+\end{funbox}
+
+\subsection{The Two Regimes}
+
+\subsubsection{Underparameterized Regime ($N > P$)}
+
+More data than parameters. We solve:
+\begin{equation}
+\hat{\vec{\beta}}_{\text{under}} = \arg\min_{\vec{\beta}} \|X\vec{\beta} - Y\|_2^2
+\end{equation}
+
+\textbf{Solution (Ordinary Least Squares):}
+\begin{keybox}
+\begin{equation}
+\hat{\vec{\beta}}_{\text{under}} = (X^T X)^{-1} X^T Y
+\end{equation}
+\end{keybox}
+
+This uses the \textbf{second moment matrix} $X^T X \in \mathbb{R}^{D \times D}$.
+
+\textbf{Derivation:}
+\begin{align}
+\frac{\partial}{\partial \vec{\beta}} \|X\vec{\beta} - Y\|_2^2 &= \frac{\partial}{\partial \vec{\beta}} (X\vec{\beta} - Y)^T(X\vec{\beta} - Y) \\
+&= \frac{\partial}{\partial \vec{\beta}} (\vec{\beta}^T X^T X \vec{\beta} - 2Y^T X\vec{\beta} + Y^T Y) \\
+&= 2X^T X\vec{\beta} - 2X^T Y = 0 \\
+\Rightarrow \vec{\beta} &= (X^T X)^{-1} X^T Y
+\end{align}
+
+\subsubsection{Overparameterized Regime ($N < P$)}
+
+More parameters than data! The problem is \textbf{ill-posed} (infinitely many solutions). We pick the \textbf{minimum norm} solution:
+\begin{equation}
+\hat{\vec{\beta}}_{\text{over}} = \arg\min_{\vec{\beta}} \|\vec{\beta}\|_2^2 \quad \text{subject to} \quad X\vec{\beta} = Y
+\end{equation}
+
+\textbf{Why minimum norm?} This is what gradient descent implicitly finds!
+
+\textbf{Solution (using Lagrangian):}
+\begin{align}
+\mathcal{L}(\vec{\beta}, \vec{\lambda}) &= \frac{1}{2}\|\vec{\beta}\|_2^2 + \vec{\lambda}^T(Y - X\vec{\beta}) \\
+\frac{\partial \mathcal{L}}{\partial \vec{\beta}} &= \vec{\beta} - X^T\vec{\lambda} = 0 \Rightarrow \vec{\beta} = X^T\vec{\lambda} \\
+\frac{\partial \mathcal{L}}{\partial \vec{\lambda}} &= Y - X\vec{\beta} = 0 \Rightarrow Y = XX^T\vec{\lambda}
+\end{align}
+
+\begin{keybox}
+\begin{equation}
+\hat{\vec{\beta}}_{\text{over}} = X^T(XX^T)^{-1}Y
+\end{equation}
+\end{keybox}
+
+This uses the \textbf{Gram matrix} $XX^T \in \mathbb{R}^{N \times N}$.
+
+\begin{funbox}
+\textbf{The Cooking Recipe Analogy:}
+
+\textbf{Underparameterized:} You've cooked 100 meals ($N=100$) and want to learn the effect of 3 ingredients ($P=3$): salt, sugar, spice. You have way more data than parameters -- you can clearly see ``add more salt $\rightarrow$ tastier food''.
+
+\textbf{Overparameterized:} You've only cooked 3 meals ($N=3$) but trying to learn 100 ingredient weights ($P=100$). Yikes! But here's the trick: you pick the \textit{simplest} recipe (minimum norm) that explains your 3 meals. Maybe ``just use salt, ignore the other 99 ingredients.'' This prevents overfitting!
+\end{funbox}
+
+\section{Singular Value Decomposition (SVD): The Magic Lens}
+
+\subsection{SVD Basics}
+
+Every matrix $X \in \mathbb{R}^{N \times D}$ can be decomposed:
+\begin{equation}
+X = U S V^T
+\end{equation}
+
+where:
+\begin{itemize}
+\item $U \in \mathbb{R}^{N \times R}$: Left singular vectors (orthonormal)
+\item $S \in \mathbb{R}^{R \times R}$: Diagonal matrix with singular values $\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_R > 0$
+\item $V \in \mathbb{R}^{D \times R}$: Right singular vectors (orthonormal)
+\item $R = \text{rank}(X) \leq \min(N, D)$
+\end{itemize}
+
+\textbf{Key properties:}
+\begin{align}
+X^T X &= V S^2 V^T \quad \text{(eigendecomposition of second moment matrix)} \\
+XX^T &= U S^2 U^T \quad \text{(eigendecomposition of Gram matrix)}
+\end{align}
+
+\begin{mathbox}
+\textbf{Why SVD is powerful for understanding double descent:}
+
+The SVD reveals the \textit{directions of variation} in your data:
+\begin{itemize}
+\item $\sigma_1$ (largest): Direction with most variance
+\item $\sigma_R$ (smallest): Direction with least variance
+\item At interpolation threshold, $\sigma_R \approx 0^+$ (tiny but non-zero!)
+\end{itemize}
+
+The reciprocals $1/\sigma_r$ appear in our formulas, so small $\sigma_r \rightarrow$ HUGE $1/\sigma_r \rightarrow$ DIVERGENCE!
+\end{mathbox}
+
+\subsection{Moore-Penrose Pseudoinverse}
+
+For a diagonal matrix $S$ with entries $\sigma_1, \ldots, \sigma_R$:
+\begin{equation}
+S^+ = \text{diag}\left(\frac{1}{\sigma_1}, \ldots, \frac{1}{\sigma_R}\right)
+\end{equation}
+
+If $\sigma_r > 0$, then $(S^+)_{rr} = 1/\sigma_r$. If $\sigma_r = 0$, then $(S^+)_{rr} = 0$.
+
+\begin{funbox}
+\textbf{The Compass Analogy:}
+
+Imagine you're navigating with a compass that measures direction strength:
+\begin{itemize}
+\item \textbf{North:} Strong signal ($\sigma_1 = 10$)
+\item \textbf{East:} Weak signal ($\sigma_2 = 0.1$)
+\item \textbf{South:} Super weak ($\sigma_3 = 0.001$)
+\end{itemize}
+
+To ``invert'' your journey, you need to divide by these signals:
+\begin{itemize}
+\item North: $1/10 = 0.1$ (easy!)
+\item East: $1/0.1 = 10$ (getting risky...)
+\item South: $1/0.001 = 1000$ (\textbf{BOOM! Explodes!})
+\end{itemize}
+
+Small singular values $\rightarrow$ huge inverses $\rightarrow$ numerical chaos!
+\end{funbox}
+
+\section{The Critical Equation: Why Double Descent Happens}
+
+\subsection{Decomposing the Target}
+
+The true relationship between features and targets:
+\begin{equation}
+Y = X\vec{\beta}^* + E
+\end{equation}
+
+where:
+\begin{itemize}
+\item $\vec{\beta}^* \in \mathbb{R}^D$: The ideal linear parameters
+\item $E \in \mathbb{R}^{N \times 1}$: Residual errors (noise, model misspecification, missing features)
+\end{itemize}
+
+\subsection{Predictions in Both Regimes}
+
+Using SVD $X = USV^T$:
+
+\textbf{Underparameterized prediction:}
+\begin{align}
+\hat{y}_{\text{test}}^{\text{under}} &= \vec{x}_{\text{test}}^T (X^T X)^{-1} X^T Y \\
+&= \vec{x}_{\text{test}}^T V S^{-2} V^T V S U^T (X\vec{\beta}^* + E) \\
+&= \vec{x}_{\text{test}}^T V S^{-1} U^T (X\vec{\beta}^* + E)
+\end{align}
+
+\textbf{Overparameterized prediction:}
+\begin{align}
+\hat{y}_{\text{test}}^{\text{over}} &= \vec{x}_{\text{test}}^T X^T(XX^T)^{-1}Y \\
+&= \vec{x}_{\text{test}}^T V S U^T (USU^T)^{-1} (X\vec{\beta}^* + E) \\
+&= \vec{x}_{\text{test}}^T V S U^T U S^{-2} U^T (X\vec{\beta}^* + E) \\
+&= \vec{x}_{\text{test}}^T V S^{-1} U^T (X\vec{\beta}^* + E)
+\end{align}
+
+\begin{mathbox}
+\textbf{Key Insight:} Both regimes share a common term!
+\begin{equation}
+\text{Common term} = \vec{x}_{\text{test}}^T V S^{-1} U^T E
+\end{equation}
+
+This term causes the divergence at the interpolation threshold.
+\end{mathbox}
+
+\subsection{The Prediction Error}
+
+Ideal prediction: $y_{\text{test}}^* = \vec{x}_{\text{test}} \cdot \vec{\beta}^*$
+
+\textbf{Underparameterized error:}
+\begin{keybox}
+\begin{equation}
+\hat{y}_{\text{test}}^{\text{under}} - y_{\text{test}}^* = \underbrace{\vec{x}_{\text{test}}^T V S^{-1} U^T E}_{\text{DIVERGENCE TERM}} = \sum_{r=1}^{R} \frac{1}{\sigma_r} (\vec{x}_{\text{test}} \cdot \vec{v}_r)(\vec{u}_r \cdot E)
+\end{equation}
+\end{keybox}
+
+\textbf{Overparameterized error:}
+\begin{keybox}
+\begin{equation}
+\hat{y}_{\text{test}}^{\text{over}} - y_{\text{test}}^* = \underbrace{\vec{x}_{\text{test}}^T V S^{-1} U^T E}_{\text{SAME DIVERGENCE}} + \underbrace{\vec{x}_{\text{test}}^T(I - VV^T)\vec{\beta}^*}_{\text{BIAS TERM}}
+\end{equation}
+\end{keybox}
+
+\section{The Three Factors of Double Descent}
+
+The divergence term reveals three factors that must \textit{all} be present:
+
+\begin{keybox}
+\begin{equation}
+\boxed{\text{Divergence} = \sum_{r=1}^{R} \underbrace{\frac{1}{\sigma_r}}_{\text{Factor 1}} \cdot \underbrace{(\vec{x}_{\text{test}} \cdot \vec{v}_r)}_{\text{Factor 2}} \cdot \underbrace{(\vec{u}_r \cdot E)}_{\text{Factor 3}}}
+\end{equation}
+\end{keybox}
+
+\subsection{Factor 1: Small Singular Values in Training Features}
+
+\textbf{What it means:} The training data $X$ has some directions with very little variance.
+
+\textbf{Why it matters:} Small $\sigma_r \rightarrow$ huge $1/\sigma_r \rightarrow$ amplification of errors!
+
+\textbf{When it occurs:} Near the interpolation threshold! As $N \rightarrow D$, the last few singular values become tiny.
+
+\begin{funbox}
+\textbf{The Pancake Analogy:}
+
+You're measuring pancake quality with 3 features: [thickness, diameter, fluffiness].
+
+\begin{itemize}
+\item \textbf{1 pancake:} Variance exists in only 1 direction (say, this pancake is thick). $\sigma_1 > 0$, but $\sigma_2 = \sigma_3 = 0$.
+
+\item \textbf{2 pancakes:} Second pancake adds a second direction (this one's also fluffy). But it's probably also a bit thick, so the second direction has \textit{less} variance than the first. $\sigma_1 > \sigma_2 > 0$, $\sigma_3 = 0$.
+
+\item \textbf{3 pancakes (interpolation threshold!):} Third pancake adds diameter variation, but it's probably also thick and fluffy. The third direction has \textit{even less} variance. $\sigma_3$ is tiny! This is the danger zone.
+
+\item \textbf{4+ pancakes:} Now each dimension gets more samples, $\sigma_3$ grows, and we're safe.
+\end{itemize}
+\end{funbox}
+
+\textbf{Mathematical reason:} Consider $N$ data points $\vec{x}_1, \ldots, \vec{x}_N$ in $\mathbb{R}^D$. They span an $R$-dimensional subspace where $R = \min(N, D)$. Near $N = D$:
+\begin{itemize}
+\item First datum: 1 direction, $\sigma_1 \sim O(1)$
+\item Second datum: likely overlaps with first, $\sigma_2 < \sigma_1$
+\item ...
+\item $N$-th datum: likely overlaps with all previous, $\sigma_N \ll \sigma_1$
+\end{itemize}
+
+\subsection{Factor 2: Test Features in Training Feature Subspace}
+
+\textbf{What it means:} The test point $\vec{x}_{\text{test}}$ has a large projection onto the weak directions $\vec{v}_r$ (the ones with small $\sigma_r$).
+
+\textbf{Why it matters:} If $\vec{x}_{\text{test}} \cdot \vec{v}_r$ is large and $\sigma_r$ is small, the error explodes!
+
+\textbf{Geometric picture:} The model must extrapolate along directions where it has little information.
+
+\begin{funbox}
+\textbf{The GPS Analogy:}
+
+Your GPS training data has great coverage of North-South roads ($\sigma_1$ large) but terrible coverage of East-West roads ($\sigma_2$ tiny).
+
+If your test point is on a North-South road: $\vec{x}_{\text{test}} \cdot \vec{v}_1$ is large, $\vec{x}_{\text{test}} \cdot \vec{v}_2$ is small. You're fine!
+
+If your test point is on an East-West road: $\vec{x}_{\text{test}} \cdot \vec{v}_2$ is large, and you have to extrapolate along a direction you barely trained on. \textbf{Disaster!}
+
+Even worse: your test point is on a diagonal road (both components large). You're extrapolating in EVERY poorly-covered direction. \textbf{Maximum chaos!}
+\end{funbox}
+
+\subsection{Factor 3: Residual Errors from Best Possible Model}
+
+\textbf{What it means:} Even the ideal model $\vec{\beta}^*$ makes errors $E = Y - X\vec{\beta}^*$ that project onto $\vec{u}_r$.
+
+\textbf{Why it matters:} These errors get amplified by $1/\sigma_r$ and leak into the predictions!
+
+\textbf{Sources of $E$:}
+\begin{enumerate}
+\item \textbf{Label noise:} $y_n = \vec{x}_n \cdot \vec{\beta}^* + \epsilon_n$ where $\epsilon_n \sim \mathcal{N}(0, \sigma^2)$
+\item \textbf{Model misspecification:} True relation is nonlinear but we use linear model
+\item \textbf{Missing features:} $y = \beta_1 x_1 + \beta_2 x_2 + \beta_3 x_3$ but we only observe $x_1, x_2$
+\end{enumerate}
+
+\begin{funbox}
+\textbf{The Fortune Teller Analogy:}
+
+You're predicting lottery numbers (good luck!).
+
+\begin{itemize}
+\item \textbf{No noise case:} If lottery numbers were deterministic (say, always [1,2,3,4,5]), the ``best possible model'' would be perfect. $E = 0 \rightarrow$ no divergence!
+
+\item \textbf{Noisy case:} Lottery numbers are random. Even the best model makes errors. Those errors $E$ exist in every direction, including the weak directions with small $\sigma_r$. When you try to invert ($1/\sigma_r$), you massively amplify the noise. \textbf{Boom!}
+
+\item \textbf{Model misspecification:} True lottery formula is ``multiply yesterday's numbers by $\pi$ then take modulo 100'' (nonlinear!), but you use a linear model. You'll have residual errors $E$ that can't be eliminated.
+\end{itemize}
+
+\textbf{Absurd example:} You're trying to predict whether it will rain by measuring ice cream sales. The ``best linear model'' is terrible because ice cream sales don't cause rain (correlation $\neq$ causation). Huge residuals $E \rightarrow$ double descent apocalypse!
+\end{funbox}
+
+\section{Why the Interpolation Threshold?}
+
+\subsection{Evolution of Smallest Singular Value}
+
+As we increase $N$ from 1 to $D$ and beyond:
+
+\begin{equation}
+\sigma_{\min}(N) = \begin{cases}
+\text{Doesn't exist} & N = 1 \text{ (rank 1)} \\
+\text{Small} & N = 2 \\
+\text{Smaller} & N = 3 \\
+\vdots \\
+\text{Tiny!} & N = D-1 \\
+\text{Smallest!} & N = D \text{ (interpolation threshold)} \\
+\text{Growing...} & N = D+1 \\
+\text{Stabilizes} & N \gg D
+\end{cases}
+\end{equation}
+
+\textbf{Intuition:} With $N < D$, you can't even reach the $D$-dimensional space. With $N = D$, you \textit{barely} reach it, so the last direction has almost zero variance. With $N > D$, each direction gets more samples and variance increases.
+
+\begin{funbox}
+\textbf{The Party Guests Analogy:}
+
+You're throwing a party in a 3D room (3 dimensions). You want to understand how guests spread out.
+
+\begin{itemize}
+\item \textbf{1 guest:} They're just a point. You know 1 direction (where they are), but have NO idea about the other 2 dimensions.
+
+\item \textbf{2 guests:} They define a line. You know 2 directions now, but the second direction (along the line) has way less ``spread'' than if they were far apart.
+
+\item \textbf{3 guests (interpolation threshold):} They \textit{barely} define a plane. If they're almost collinear (which is likely!), the third direction has almost zero variance. You're teetering on the edge!
+
+\item \textbf{4+ guests:} Now you have redundancy. The 3D space is well-covered. All three dimensions have solid variance.
+\end{itemize}
+
+At exactly 3 guests in 3D, you're in the \textbf{danger zone} -- tiny perturbations cause huge changes!
+\end{funbox}
+
+\section{Geometric Interpretation}
+
+\subsection{Underparameterized Geometry}
+
+In the underparameterized regime, we use $X^TX$:
+\begin{equation}
+X^T X = V S^2 V^T = \sum_{r=1}^{R} \sigma_r^2 \vec{v}_r \vec{v}_r^T
+\end{equation}
+
+This is the \textbf{empirical covariance matrix} (up to scaling by $1/N$). The eigenvectors $\vec{v}_r$ are the principal components -- directions of variance.
+
+\subsection{Overparameterized Geometry: Representation Learning!}
+
+In the overparameterized regime, we use $XX^T$ and create an \textit{internal representation}:
+\begin{keybox}
+\begin{equation}
+\hat{\vec{x}}_{\text{test}} = X^T(XX^T)^{-1}X\vec{x}_{\text{test}} = \sum_{r=1}^{R} \vec{v}_r \vec{v}_r^T \vec{x}_{\text{test}} = VV^T\vec{x}_{\text{test}}
+\end{equation}
+\end{keybox}
+
+This is an \textbf{orthogonal projection} of $\vec{x}_{\text{test}}$ onto the row space of $X$!
+
+\textbf{The bias term becomes:}
+\begin{equation}
+\text{Bias} = \vec{x}_{\text{test}}^T(I - VV^T)\vec{\beta}^* = (\vec{x}_{\text{test}} - \hat{\vec{x}}_{\text{test}})^T \vec{\beta}^*
+\end{equation}
+
+\textbf{Interpretation:} The model can only ``see'' the projection $\hat{\vec{x}}_{\text{test}}$, not the full $\vec{x}_{\text{test}}$. Information about $\vec{\beta}^*$ in the orthogonal directions $(I-VV^T)\vec{\beta}^*$ is lost!
+
+\begin{funbox}
+\textbf{The Shadow Analogy:}
+
+You're a 3D creature trying to understand a 2D world (flatland).
+
+\begin{itemize}
+\item Your training data $X$ lives in a 2D plane (the row space).
+\item A test point $\vec{x}_{\text{test}}$ is in 3D.
+\item Your model projects it onto the 2D plane: $\hat{\vec{x}}_{\text{test}} = VV^T\vec{x}_{\text{test}}$ (the shadow).
+\item The model can ONLY see the shadow, not the full 3D point!
+\item If $\vec{\beta}^*$ has components in the 3D direction (perpendicular to the plane), that information is lost. Bias!
+\end{itemize}
+
+\textbf{Absurd version:} You're trying to predict a 3D dinosaur's weight by looking at its 2D shadow. If the dinosaur is oriented to minimize its shadow (thin edge facing the light), your prediction is garbage!
+\end{funbox}
+
+\section{Ablation Experiments: Testing Our Understanding}
+
+To verify the three factors, we can ablate (remove) each one and check if the divergence disappears.
+
+\subsection{Ablation 1: Remove Small Singular Values}
+
+Set $\sigma_r = 0$ for all $\sigma_r < \text{threshold}$.
+
+\textbf{Prediction:} Divergence should decrease or disappear.
+
+\textbf{Why:} No small $\sigma_r \rightarrow$ no huge $1/\sigma_r \rightarrow$ no amplification!
+
+\subsection{Ablation 2: Project Test Data onto Leading Modes}
+
+Replace $\vec{x}_{\text{test}}$ with $\sum_{r=1}^{k} (\vec{x}_{\text{test}} \cdot \vec{v}_r)\vec{v}_r$ where $k \ll R$ (keep only top $k$ modes).
+
+\textbf{Prediction:} Divergence should decrease.
+
+\textbf{Why:} Test data no longer projects onto the weak modes $\vec{v}_r$ with small $\sigma_r$.
+
+\subsection{Ablation 3: Remove Residual Errors}
+
+Create a noiseless, perfectly linear dataset: $Y_{\text{new}} = X\vec{\beta}_{\text{fit}}$ where $\vec{\beta}_{\text{fit}}$ is fit on the full dataset.
+
+\textbf{Prediction:} Divergence should disappear entirely.
+
+\textbf{Why:} $E = 0 \rightarrow$ divergence term is zero!
+
+\section{Adversarial Examples}
+
+\subsection{Adversarial Test Examples}
+
+To maximize test error, make $\vec{x}_{\text{test}} \cdot \vec{v}_r$ large for the mode $r$ with smallest $\sigma_r$:
+\begin{equation}
+\vec{x}_{\text{test}}^{\text{adv}} = \alpha \vec{v}_R \quad \text{(where $\sigma_R$ is smallest)}
+\end{equation}
+
+\textbf{Effect:} Test MSE explodes!
+
+\begin{funbox}
+\textbf{Adversarial Test = Finding Your Model's Blind Spot}
+
+Your GPS model has terrible East-West coverage ($\vec{v}_2$ weak direction). An adversarial test point is just... asking for directions on an East-West road! Your model panics because it has to extrapolate wildly.
+
+\textbf{Absurd version:} You trained a ``cat detector'' only on photos of orange tabbies. An adversarial test image is a black cat. Your model outputs ``NEGATIVE 5000\% CAT'' because it's never seen this direction in feature space!
+\end{funbox}
+
+\subsection{Adversarial Training Data (Dataset Poisoning)}
+
+To maximize test error via training data, manipulate the residuals $E$ to align with $\vec{u}_r$ for small $\sigma_r$:
+\begin{equation}
+E^{\text{adv}} = \gamma \vec{u}_R \quad \text{(where $\sigma_R$ is smallest)}
+\end{equation}
+
+\textbf{Effect:} Training error unchanged, test error explodes by 1-3 orders of magnitude!
+
+\begin{funbox}
+\textbf{Data Poisoning = Subtle Sabotage}
+
+Imagine you're poisoning a linear model for pizza delivery time prediction. You change the labels slightly so that residual errors align with the weakest training direction (maybe ``distance to pizzeria along Elm Street'').
+
+The training error looks fine (small perturbations). But at test time, predictions for Elm Street addresses are catastrophically wrong!
+
+\textbf{Absurd version:} You're training a model to predict exam scores from study hours. An adversary poisons your training data so that students who study exactly 3.7 hours have corrupted scores. At the interpolation threshold, predictions for 3.7-hour studiers are ``you'll score -500\%!''
+\end{funbox}
+
+\section{Connection to Nonlinear Models}
+
+The intuition extends beyond linear regression!
+
+\subsection{Neural Tangent Kernel (NTK)}
+
+For wide neural networks, training dynamics resemble kernel regression:
+\begin{equation}
+\vec{\beta}_{\text{NTK}}(t) = K^+ Y
+\end{equation}
+where $K$ is the NTK. Same SVD story applies!
+
+\subsection{Superposition in Autoencoders}
+
+Henighan et al. (2023) found that autoencoders:
+\begin{itemize}
+\item \textbf{Memorize data points} (use $XX^T$-like features) when $N < D$
+\item \textbf{Learn generalizing features} (use $X^TX$-like features) when $N > D$
+\item \textbf{Exhibit double descent} at the transition!
+\end{itemize}
+
+\textbf{Our clarification:} ``Data point features'' CAN generalize! The issue isn't memorization vs. generalization -- it's about the spectrum.
+
+\section{Practical Implications}
+
+\subsection{When to Expect Double Descent}
+
+Double descent requires \textbf{all three factors}:
+\begin{enumerate}
+\item Small (non-zero) singular values in training data
+\item Test data varies in those weak directions
+\item Residual errors in best model
+\end{enumerate}
+
+\textbf{Safe regimes:}
+\begin{itemize}
+\item Far from interpolation threshold ($N \ll D$ or $N \gg D$)
+\item Clean, noiseless data ($E \approx 0$)
+\item Regularization (adds to singular values, prevents $\sigma_r \rightarrow 0$)
+\item Well-conditioned data (all $\sigma_r$ roughly equal)
+\end{itemize}
+
+\subsection{How to Avoid Double Descent}
+
+\begin{enumerate}
+\item \textbf{Regularization:} $\hat{\vec{\beta}} = (X^TX + \lambda I)^{-1}X^TY$ replaces $\sigma_r^2$ with $\sigma_r^2 + \lambda$, preventing small singular values.
+
+\item \textbf{Data augmentation:} More diverse data $\rightarrow$ larger smallest singular value.
+
+\item \textbf{Feature selection:} Remove redundant features $\rightarrow$ better-conditioned $X$.
+
+\item \textbf{Early stopping:} Stop training before exact interpolation.
+
+\item \textbf{Ensembling:} Errors from small $\sigma_r$ are high-variance; averaging helps.
+\end{enumerate}
+
+\section{Summary and Key Takeaways}
+
+\begin{keybox}
+\textbf{The Double Descent Story:}
+
+\begin{enumerate}
+\item Double descent is NOT mysterious -- it's a confluence of three factors.
+
+\item The SVD reveals everything: small $\sigma_r \rightarrow$ huge $1/\sigma_r \rightarrow$ amplified errors.
+
+\item Interpolation threshold is the danger zone because $\sigma_{\min}$ reaches its minimum there.
+
+\item Overparameterization can help because it forces models to learn compressed representations (projection onto row space).
+
+\item Both underparameterized and overparameterized regimes share a common variance term; overparameterized adds a bias term.
+\end{enumerate}
+\end{keybox}
+
+\begin{funbox}
+\textbf{The Final Absurd Analogy: Machine Learning as a Tightrope Walk}
+
+\begin{itemize}
+\item \textbf{Underparameterized:} You're walking on a wide bridge. Safe, but boring. You can't fit complex patterns.
+
+\item \textbf{At interpolation threshold:} You're on a tightrope over a canyon. One gust of wind (small $\sigma_r$), and you're done for. \textbf{Maximum danger!}
+
+\item \textbf{Slightly overparameterized:} You fell off the tightrope... but there's a safety net! (The bias term provides stability, and the model learns useful features.)
+
+\item \textbf{Massively overparameterized:} You're walking on a cloud. So many parameters that the model finds low-dimensional structure and generalizes beautifully.
+\end{itemize}
+
+The lesson? Don't balance on the tightrope. Either stay on the bridge or jump into the cloud!
+\end{funbox}
+
+\section*{References}
+
+\begin{enumerate}
+\item Belkin, M., et al. (2019). ``Reconciling modern machine-learning practice and the classical bias-variance trade-off.'' \textit{PNAS}.
+\item Nakkiran, P., et al. (2021). ``Deep double descent: Where bigger models and more data hurt.'' \textit{Journal of Statistical Mechanics}.
+\item Advani, M. S., \& Saxe, A. M. (2020). ``High-dimensional dynamics of generalization error in neural networks.'' \textit{Neural Networks}.
+\item Bartlett, P. L., et al. (2020). ``Benign overfitting in linear regression.'' \textit{PNAS}.
+\item Hastie, T., et al. (2022). ``Surprises in high-dimensional ridgeless least squares interpolation.'' \textit{The Annals of Statistics}.
+\item ICLR 2024 Blogpost: ``Double Descent Demystified''
+\item arXiv:2303.14151
+\end{enumerate}
+
+\end{document}
