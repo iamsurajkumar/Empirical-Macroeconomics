@@ -1,0 +1,27 @@
+name: Compile LaTeX Document
+
+on:
+  push:
+    paths:
+      - '**.tex'
+  workflow_dispatch:
+
+jobs:
+  build-latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v2
+        with:
+          root_file: double_descent_tutorial.tex
+          args: -pdf -interaction=nonstopmode -file-line-error
+      
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: double_descent_tutorial
+          path: double_descent_tutorial.pdf
+          if-no-files-found: error
