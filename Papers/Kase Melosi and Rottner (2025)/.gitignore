@@ -1,0 +1,54 @@
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/deps/deps.jl
+Manifest.toml
+
+# Saved models (large files)
+## Legacy location (kept for backward compatibility)
+save/*
+!save/.gitkeep
+
+# Current location for model artifacts
+models/*.jld2
+models/**/*.jld2
+
+# Generated figures (can be regenerated)
+# Uncomment if you want to version control figures
+# figures/*.pdf
+# figures/*.png
+
+# Data files (large, should be documented not versioned)
+data/**/*.csv
+data/**/*.jld2
+data/**/*.h5
+!data/README.md
+!data/**/*.md
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.log
+
+# Jupyter/Pluto
+.ipynb_checkpoints/
+*.ipynb
+
+# Python (if using Python tools)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
