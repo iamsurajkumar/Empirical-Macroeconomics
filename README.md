@@ -24,6 +24,7 @@ Standard and advanced econometric implementations.
 Code and data accompanying specific research papers and classic model replications.
 - **Borovička & Shimer (2025)**: Replication materials.
 - **Hopenhayn (1992)**: Industry dynamics model implementation.
+- **Kase Melosi and Rottner (2025)**: Neural Network NK Model (clean code for the first part of the project).
 
 ### 4. General Analysis (`Analysis/`)
 Ad-hoc analysis and exploratory notebooks.
